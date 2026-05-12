@@ -29,7 +29,8 @@ class CloudinaryDioInterceptor extends Interceptor {
     _log.error(
       'ERROR [${err.response?.statusCode}] ← ${err.requestOptions.uri}\n'
       '  type   : ${err.type}\n'
-      '  message: ${err.message}',
+      '  message: ${err.message}'
+      '  data: ${_summariseData(err.response?.data)}',
       error: err,
       stackTrace: err.stackTrace,
     );
