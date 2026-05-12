@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 
+import '../utils/interceptor.dart';
+
 /// Cloudinary API abstraction class for making requests to the Cloudinary API
 /// It uses the [Dio] to make the requests
 abstract class CloudinaryApi {
@@ -19,7 +21,8 @@ abstract class CloudinaryApi {
   /// It takes the [apiKey], [apiSecret] and [cloudName] as parameters
   /// to build the [defaultUrl]
   CloudinaryApi({String? apiKey, String? apiSecret})
-    : _dio = Dio(BaseOptions(baseUrl: '$defaultUrl/')),
+    : _dio = Dio(BaseOptions(baseUrl: '$defaultUrl/'))
+        ..interceptors.add(CloudinaryDioInterceptor()),
       _deleteDio = Dio(
         BaseOptions(
           baseUrl: '$defaultUrl/'.replaceFirst(
@@ -27,7 +30,7 @@ abstract class CloudinaryApi {
             'https://$apiKey:$apiSecret@',
           ),
         ),
-      );
+      )..interceptors.add(CloudinaryDioInterceptor());
 
   /// Post request to the cloudinary api
   Future<Response<T>> post<T>(

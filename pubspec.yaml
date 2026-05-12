@@ -1,11 +1,11 @@
 name: cloudinary
 description: A dart package to integrate Cloudinary API in Dart and Flutter.
 
-version: 1.1.0
+version: 1.1.1
 
-homepage: https://github.com/nixrajput
-repository: https://github.com/nixrajput/cloudinary-dart
-issue_tracker: https://github.com/nixrajput/cloudinary-dart/issues
+homepage: https://github.com/Flitbase-Flitaa
+repository: https://github.com/Flitbase-Flitaa/cloudinary-sdk
+issue_tracker: https://github.com/Flitbase-Flitaa/cloudinary-sdk/issues
 
 environment:
   sdk: ^3.8.1

@@ -1,54 +1,30 @@
-import 'package:cloudinary/src/api_client/cloudinary_api.dart';
-import 'package:cloudinary/src/enums/cloudinary_resource_type.dart';
-import 'package:cloudinary/src/models/cloudinary_response.dart';
 import 'package:dio/dio.dart';
 
-/// Cloudinary Api Client class
-/// This class is used to make the requests to the cloudinary api
+import '../enums/cloudinary_resource_type.dart';
+import '../models/cloudinary_response.dart';
+import '../utils/logger.dart';
+import 'cloudinary_api.dart';
+
 class CloudinaryApiClient extends CloudinaryApi {
   static const _signedRequestAssertMessage =
-      'This endpoint requires an '
-      'authorized request, check the Cloudinary constructor you are using and '
-      'make sure you are using a valid `apiKey`, `apiSecret` and `cloudName`.';
+      'This endpoint requires an authorized request, check the Cloudinary '
+      'constructor you are using and make sure you are using a valid '
+      '`apiKey`, `apiSecret` and `cloudName`.';
 
-  /// The [apiKey] used to make the authorized requests
   final String apiKey;
-
-  /// The [apiSecret] used to make the authorized requests
   final String apiSecret;
-
-  /// The [cloudName] used to make the requests
   final String cloudName;
 
-  /// The [CloudinaryApiClient] constructor used to initialize the class
-  /// [apiKey] is used to make the authorized requests
-  /// [apiSecret] is used to make the authorized requests
-  /// [cloudName] is used to make the requests
+  // Convenience accessor so methods below stay terse
+  static CloudinaryLogger get _log => CloudinaryLogger.instance;
+
   CloudinaryApiClient({
     required this.apiKey,
     required this.apiSecret,
     required this.cloudName,
   }) : super(apiKey: apiKey, apiSecret: apiSecret);
 
-  /// Returns if the [CloudinaryApiClient] is authorized or not
   bool get isBasic => apiKey.isEmpty || apiSecret.isEmpty || cloudName.isEmpty;
-
-  /// Uploads a file of [resourceType] with [fileName] to a [folder]
-  /// in your specified [cloudName]
-  /// The file to be uploaded can be from a path or a byte array
-  ///
-  /// [file] path to the file to upload
-  /// [fileBytes] byte array of the file to uploaded
-  /// [resourceType] defaults to [CloudinaryResourceType.auto]
-  /// [fileName] is not mandatory, if not specified then a random name will be used
-  /// [optParams] a Map of optional parameters as defined in
-  /// https://cloudinary.com/documentation/image_upload_api_reference
-  ///
-  /// Response:
-  /// Check all the attributes in the CloudinaryResponse to get the information
-  /// you need... including secureUrl, publicId, etc.
-  ///
-  /// Official documentation: https://cloudinary.com/documentation/upload_images
 
   Future<CloudinaryResponse> upload({
     String? file,
@@ -66,25 +42,25 @@ class CloudinaryApiClient extends CloudinaryApi {
       throw Exception('One of filePath or fileBytes must not be null');
     }
 
-    var timeStamp = DateTime.now().millisecondsSinceEpoch;
     resourceType ??= CloudinaryResourceType.auto;
+    _log.info(
+      'upload() → resource: ${resourceType.name}, '
+      'folder: $folder, publicId: ${publicId ?? fileName ?? "auto"}',
+    );
 
+    var timeStamp = DateTime.now().millisecondsSinceEpoch;
     var params = <String, dynamic>{};
 
     if (publicId != null || fileName != null) {
       params['public_id'] = publicId ?? fileName;
     }
     if (folder != null) params['folder'] = folder;
-
-    /// Setting the optParams... this would override the public_id and folder
-    /// if specified by user.
     if (optParams != null) params.addAll(optParams);
     params['api_key'] = apiKey;
     params['file'] = fileBytes != null
         ? MultipartFile.fromBytes(
             fileBytes,
-            filename:
-                fileName ?? DateTime.now().millisecondsSinceEpoch.toString(),
+            filename: fileName ?? timeStamp.toString(),
           )
         : await MultipartFile.fromFile(file!, filename: fileName);
     params['timestamp'] = timeStamp;
@@ -107,33 +83,19 @@ class CloudinaryApiClient extends CloudinaryApi {
       );
       statusCode = response.statusCode;
       cloudinaryResponse = CloudinaryResponse.fromJsonMap(response.data);
-    } catch (error, stacktrace) {
-      print('Exception occurred: $error stackTrace: $stacktrace');
-      if (error is DioException) statusCode = error.response?.statusCode;
-      cloudinaryResponse = CloudinaryResponse.fromError('$error');
+      _log.success(
+        'upload() → status: $statusCode, '
+        'publicId: ${cloudinaryResponse.publicId}',
+      );
+    } catch (e, st) {
+      _log.error('upload() failed', error: e, stackTrace: st);
+      if (e is DioException) statusCode = e.response?.statusCode;
+      cloudinaryResponse = CloudinaryResponse.fromError('$e');
     }
     cloudinaryResponse.statusCode = statusCode;
     return cloudinaryResponse;
   }
 
-  /// Uploads a file of [resourceType] with [fileName] to a [folder] in your
-  /// specified [cloudName] using a [uploadPreset] with no need to specify an
-  /// [apiKey] nor [apiSecret].
-  /// The file to be uploaded can be from a path or a byte array
-  ///
-  /// [file] path to the file to upload
-  /// [fileBytes] byte array of the file to uploaded
-  /// [resourceType] defaults to [CloudinaryResourceType.auto]
-  /// [fileName] is not mandatory, if not specified then a random name will be used
-  /// [optParams] a Map of optional parameters as defined in
-  /// https://cloudinary.com/documentation/image_upload_api_reference
-  ///
-  /// Response:
-  /// Check all the attributes in the CloudinaryResponse to get the information
-  /// you need... including secureUrl, publicId, etc.
-  ///
-  /// Official documentation:
-  /// https://cloudinary.com/documentation/upload_images#unsigned_upload
   Future<CloudinaryResponse> unsignedUpload({
     String? file,
     required String uploadPreset,
@@ -152,15 +114,16 @@ class CloudinaryApiClient extends CloudinaryApi {
     }
 
     resourceType ??= CloudinaryResourceType.auto;
+    _log.info(
+      'unsignedUpload() → preset: $uploadPreset, '
+      'resource: ${resourceType.name}, folder: $folder',
+    );
 
     final params = <String, dynamic>{
       'upload_preset': uploadPreset,
       if (publicId != null || fileName != null)
         'public_id': publicId ?? fileName,
       if (folder != null) 'folder': folder,
-
-      /// Setting the optParams... this would override the public_id and folder
-      /// if specified by user.
       if (optParams?.isNotEmpty ?? false) ...optParams!,
     };
 
@@ -185,29 +148,19 @@ class CloudinaryApiClient extends CloudinaryApi {
       );
       statusCode = response.statusCode;
       cloudinaryResponse = CloudinaryResponse.fromJsonMap(response.data);
-    } catch (error, stacktrace) {
-      print('Exception occurred: $error stackTrace: $stacktrace');
-      if (error is DioException) statusCode = error.response?.statusCode;
-      cloudinaryResponse = CloudinaryResponse.fromError('$error');
+      _log.success(
+        'unsignedUpload() → status: $statusCode, '
+        'publicId: ${cloudinaryResponse.publicId}',
+      );
+    } catch (e, st) {
+      _log.error('unsignedUpload() failed', error: e, stackTrace: st);
+      if (e is DioException) statusCode = e.response?.statusCode;
+      cloudinaryResponse = CloudinaryResponse.fromError('$e');
     }
     cloudinaryResponse.statusCode = statusCode;
     return cloudinaryResponse;
   }
 
-  /// Deletes a file of [resourceType] with [publicId]
-  /// from your specified [cloudName]
-  ///
-  /// [publicId] The identifier of the uploaded asset. Note: The public ID value
-  /// for images and videos should not include a file extension. Include the
-  /// file extension for raw files only.
-  /// [resourceType] defaults to [CloudinaryResourceType.image]
-  /// [invalidate] If true, invalidates CDN cached copies of the asset (and all
-  /// its transformed versions). Default: false.
-  /// [optParams] a Map of optional parameters as defined in
-  /// https://cloudinary.com/documentation/image_upload_api_reference#destroy_method
-  ///
-  /// Response:
-  /// Check response.isResultOk to know if the file was successfully deleted.
   Future<CloudinaryResponse> destroy(
     String publicId, {
     CloudinaryResourceType? resourceType,
@@ -216,9 +169,13 @@ class CloudinaryApiClient extends CloudinaryApi {
   }) async {
     assert(!isBasic, _signedRequestAssertMessage);
 
-    var timeStamp = DateTime.now().millisecondsSinceEpoch;
     resourceType ??= CloudinaryResourceType.image;
+    _log.info(
+      'destroy() → publicId: $publicId, '
+      'resource: ${resourceType.name}, invalidate: $invalidate',
+    );
 
+    var timeStamp = DateTime.now().millisecondsSinceEpoch;
     final params = <String, dynamic>{};
 
     if (optParams != null) params.addAll(optParams);
@@ -244,10 +201,14 @@ class CloudinaryApiClient extends CloudinaryApi {
       );
       statusCode = response.statusCode;
       cloudinaryResponse = CloudinaryResponse.fromJsonMap(response.data);
-    } catch (error, stacktrace) {
-      print('Exception occurred: $error stackTrace: $stacktrace');
-      if (error is DioException) statusCode = error.response?.statusCode;
-      cloudinaryResponse = CloudinaryResponse.fromError('$error');
+      _log.success(
+        'destroy() → status: $statusCode, '
+        'result: ${cloudinaryResponse.result}',
+      );
+    } catch (e, st) {
+      _log.error('destroy() failed', error: e, stackTrace: st);
+      if (e is DioException) statusCode = e.response?.statusCode;
+      cloudinaryResponse = CloudinaryResponse.fromError('$e');
     }
     cloudinaryResponse.statusCode = statusCode;
     return cloudinaryResponse;
